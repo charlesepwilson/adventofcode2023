@@ -1,8 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
+use crate::utils::read_lines;
 
 const DIGITS: [(&str, u32); 9] = [
     ("1", 1u32),
@@ -57,14 +55,6 @@ fn sum_calibration_digits(valid_strings: HashMap<&str, u32>) -> u32 {
         }
     }
     sum
-}
-
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
 }
 
 fn combine_first_last(
