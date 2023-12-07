@@ -1,6 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
-use crate::utils::read_lines;
+use crate::utils::{FileIter, Solves};
 
 const DIGITS: [(&str, u32); 9] = [
     ("1", 1u32),
@@ -26,18 +26,29 @@ const NUMBERS: [(&str, u32); 9] = [
     ("nine", 9u32),
 ];
 
-pub fn part1() -> u32 {
-    let hashmap = HashMap::from(DIGITS);
-    sum_calibration_digits(hashmap)
+pub struct Solution;
+impl Solves for Solution {
+    const DAY: u32 = 1;
+    type T = FileIter;
+
+    fn parse_input(dir: &str) -> Self::T {
+        Self::read_file(dir)
+    }
+
+    fn part1(dir: &str) -> u32 {
+        let hashmap = HashMap::from(DIGITS);
+        sum_calibration_digits(hashmap, Self::parse_input(dir))
+    }
+
+    fn part2(dir: &str) -> u32 {
+        let mut hashmap = HashMap::from(DIGITS);
+        hashmap.extend(NUMBERS);
+        sum_calibration_digits(hashmap, Self::parse_input(dir))
+    }
 }
 
-pub fn part2() -> u32 {
-    let mut hashmap = HashMap::from(DIGITS);
-    hashmap.extend(NUMBERS);
-    sum_calibration_digits(hashmap)
-}
 
-fn sum_calibration_digits(valid_strings: HashMap<&str, u32>) -> u32 {
+fn sum_calibration_digits(valid_strings: HashMap<&str, u32>, lines: FileIter) -> u32 {
     let regex_parts: Vec<&str> = valid_strings.clone().into_keys().collect();
     let re = Regex::new(regex_parts.join("|").as_str()).unwrap();
     let mut reverse_regex_parts: Vec<String> = Vec::new();
@@ -47,12 +58,8 @@ fn sum_calibration_digits(valid_strings: HashMap<&str, u32>) -> u32 {
     }
     let rev_re = Regex::new(reverse_regex_parts.join("|").as_str()).unwrap();
     let mut sum = 0u32;
-    if let Ok(lines) = read_lines("./input/day01.txt") {
-        for line in lines {
-            if let Ok(ip) = line {
-                sum += combine_first_last(ip, valid_strings.clone(), &re, &rev_re);
-            }
-        }
+    for line in lines {
+        sum += combine_first_last(line, valid_strings.clone(), &re, &rev_re);
     }
     sum
 }

@@ -1,44 +1,44 @@
 use std::cmp::max;
 use std::collections::HashMap;
-use std::iter::zip;
-use crate::utils::read_lines;
+use std::iter::{Map, zip};
+use crate::utils::{FileIter, Solves};
 
-pub fn part1() -> u32 {
-    let max_values = [12u32, 13u32, 14u32];
-    let mut total = 0u32;
-    for (id, handful) in parse_input() {
-        let mut valid = true;
-        for ball_set in handful {
-            if zip(ball_set, max_values).any(|(a, b)| a > b) {
-                valid = false;
-                break
+pub struct Solution;
+
+impl Solves for Solution {
+    const DAY: u32 = 2;
+    type T = Map<FileIter, fn(String) -> (u32, Vec<BallSet>)>;
+    fn parse_input(dir: &str) -> Self::T {
+        Self::read_file(dir).map(parse_line)
+    }
+
+    fn part1(dir: &str) -> u32 {
+        let max_values = [12u32, 13u32, 14u32];
+        let mut total = 0;
+        for (id, handful) in Self::parse_input(dir) {
+            let mut valid = true;
+            for ball_set in handful {
+                if zip(ball_set, max_values).any(|(a, b)| a > b) {
+                    valid = false;
+                    break
+                }
             }
+            if valid {total += id;}
         }
-        if valid {total += id;}
+        total
     }
-    total
+    fn part2(dir: &str) -> u32 {
+        let mut total = 0;
+        for (_, handful) in Self::parse_input(dir) {
+            total += get_power(get_max_seen(handful))
+        }
+        total
+    }
+
 }
 
-pub fn part2() -> u32 {
-    let mut total = 0u32;
-    for (_, handful) in parse_input() {
-        total += get_power(get_max_seen(handful))
-    }
-    total
-}
 type BallSet = [u32;3];  // RGB
-
-fn parse_input() -> Vec<(u32, Vec<BallSet>)> {
-    let mut result: Vec<(u32, Vec<BallSet>)> = Vec::new();
-    if let Ok(lines) = read_lines("./input/day02.txt") {
-        for line in lines {
-            if let Ok(ip) = line {
-                result.push(parse_line(ip));
-            }
-        }
-    }
-    result
-}
+// todo make this a struct
 
 fn parse_line(line: String) -> (u32, Vec<BallSet>) {
     let (game, handfuls_str) = line.split_once(": ").unwrap();
