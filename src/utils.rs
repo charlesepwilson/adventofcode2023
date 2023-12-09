@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Lines};
 use std::iter::FilterMap;
+use std::ops::{Div, Mul, Rem};
 use std::path::Path;
 
 pub trait Solves {
@@ -41,3 +42,31 @@ pub trait Solves {
 }
 
 pub type FileIter = FilterMap<Lines<BufReader<File>>, fn(io::Result<String>) -> Option<String>>;
+
+pub fn lcm<T>(a: T, b: T) -> T
+where
+    T: Div<Output = T>,
+    T: Mul<Output = T>,
+    T: Copy,
+    T: Eq,
+    T: Default,
+    T: Rem<Output = T>,
+{
+    a * (b / gcd(a, b))
+}
+
+pub fn gcd<T>(a: T, b: T) -> T
+where
+    T: Div<Output = T>,
+    T: Mul<Output = T>,
+    T: Copy,
+    T: Eq,
+    T: Default,
+    T: Rem<Output = T>,
+{
+    if b == T::default() {
+        a
+    } else {
+        gcd(b, a % b)
+    }
+}
