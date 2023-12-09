@@ -1,42 +1,39 @@
+use crate::utils::Solves;
 use std::collections::HashMap;
-use crate::utils::read_lines;
 
+pub struct Solution;
+impl Solves for Solution {
+    const DAY: u32 = 4;
+    type ParsedInput = Vec<(usize, Vec<usize>, Vec<usize>)>;
+    type Output = usize;
 
-pub fn part1() -> usize {
-    let mut r = 0;
-    for (_, winning, own) in parse_input() {
-        r += compute_score(winning, own);
+    fn parse_input(dir: &str) -> Self::ParsedInput {
+        Self::read_file(dir).map(parse_line).collect()
     }
-    r
-}
-pub fn part2() -> usize {
-    let mut r = 0;
-    let mut gen_map = HashMap::new();
-    let input = parse_input();
-    let (max_card, _, _) = input.clone().into_iter().last().unwrap();
-    for (card, winning, own) in input.into_iter().rev() {
-        let extras = list_extras(card, winning, own, max_card);
-        let mut cards_added = 1;
-        for extra in extras {
-            cards_added += gen_map.get(&extra).unwrap();
+
+    fn part1(dir: &str) -> Self::Output {
+        let mut r = 0;
+        for (_, winning, own) in Self::parse_input(dir) {
+            r += compute_score(winning, own);
         }
-        gen_map.insert(card, cards_added);
-        r += cards_added;
+        r
     }
-    r
-}
-
-
-fn parse_input() -> Vec<(usize, Vec<usize>, Vec<usize>)>{
-    let mut result = Vec::new();
-    if let Ok(lines) = read_lines("./input/day04.txt") {
-        for line in lines {
-            if let Ok(ip) = line {
-                result.push(parse_line(ip));
+    fn part2(dir: &str) -> Self::Output {
+        let mut r = 0;
+        let mut gen_map = HashMap::new();
+        let input = Self::parse_input(dir);
+        let (max_card, _, _) = input.clone().into_iter().last().unwrap();
+        for (card, winning, own) in input.into_iter().rev() {
+            let extras = list_extras(card, winning, own, max_card);
+            let mut cards_added = 1;
+            for extra in extras {
+                cards_added += gen_map.get(&extra).unwrap();
             }
+            gen_map.insert(card, cards_added);
+            r += cards_added;
         }
+        r
     }
-    result
 }
 
 fn parse_line(line: String) -> (usize, Vec<usize>, Vec<usize>) {
@@ -48,7 +45,10 @@ fn parse_line(line: String) -> (usize, Vec<usize>, Vec<usize>) {
     (card_num, winning_numbers, own_numbers)
 }
 fn parse_numbers(string: &str) -> Vec<usize> {
-    string.split_whitespace().map(|x| x.parse().unwrap()).collect()
+    string
+        .split_whitespace()
+        .map(|x| x.parse().unwrap())
+        .collect()
 }
 
 fn compute_wins(winning_numbers: Vec<usize>, own_numbers: Vec<usize>) -> usize {
@@ -63,11 +63,20 @@ fn compute_wins(winning_numbers: Vec<usize>, own_numbers: Vec<usize>) -> usize {
 
 fn compute_score(winning_numbers: Vec<usize>, own_numbers: Vec<usize>) -> usize {
     let wins = compute_wins(winning_numbers, own_numbers);
-    if wins < 1 {return 0;}
+    if wins < 1 {
+        return 0;
+    }
     2usize.pow((wins - 1) as u32)
 }
 
-fn list_extras(card: usize, winning_numbers: Vec<usize>, own_numbers: Vec<usize>, max_card: usize) -> Vec<usize> {
+fn list_extras(
+    card: usize,
+    winning_numbers: Vec<usize>,
+    own_numbers: Vec<usize>,
+    max_card: usize,
+) -> Vec<usize> {
     let wins = compute_wins(winning_numbers, own_numbers);
-    (card+1..=card+wins).filter(|&x| x <= max_card).collect()
+    (card + 1..=card + wins)
+        .filter(|&x| x <= max_card)
+        .collect()
 }

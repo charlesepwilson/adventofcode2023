@@ -1,21 +1,42 @@
+use crate::utils::Solves;
 use std::collections::HashSet;
-use crate::utils::read_lines;
 
-pub fn part1() -> usize {
-    let mut input = parse_input();
-    input.sort_by_cached_key(sort_key);
-    let winnings = input.iter().enumerate().map(|(rank, (_, bid))| bid * (rank + 1));
-    winnings.sum()
-}
-pub fn part2() -> usize {
-    let mut input = parse_input();
-    input.sort_by_cached_key(joker_sort_key);
-    let winnings = input.iter().enumerate().map(|(rank, (_, bid))| bid * (rank + 1));
-    winnings.sum()
-}
+pub struct Solution;
+impl Solves for Solution {
+    const DAY: u32 = 7;
+    type ParsedInput = Vec<(Hand, usize)>;
+    type Output = usize;
 
+    fn parse_input(dir: &str) -> Self::ParsedInput {
+        let mut lines = Vec::new();
+        for line in Self::read_file(dir) {
+            let (cards_str, bid_str) = line.split_once(" ").unwrap();
+            let hand = cards_str.chars().map(Card::from).collect();
+            lines.push((hand, bid_str.parse().unwrap()));
+        }
+        lines
+    }
+    fn part1(dir: &str) -> Self::Output {
+        let mut input = Self::parse_input(dir);
+        input.sort_by_cached_key(sort_key);
+        let winnings = input
+            .iter()
+            .enumerate()
+            .map(|(rank, (_, bid))| bid * (rank + 1));
+        winnings.sum()
+    }
+    fn part2(dir: &str) -> Self::Output {
+        let mut input = Self::parse_input(dir);
+        input.sort_by_cached_key(joker_sort_key);
+        let winnings = input
+            .iter()
+            .enumerate()
+            .map(|(rank, (_, bid))| bid * (rank + 1));
+        winnings.sum()
+    }
+}
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq, Ord, Eq, Hash)]
-enum Card {
+pub enum Card {
     Joker = 1,
     Two,
     Three,
@@ -79,23 +100,7 @@ impl HandType {
     }
 }
 
-
 type Hand = Vec<Card>;
-
-
-fn parse_input() -> Vec<(Hand, usize)> {
-    let mut lines = Vec::new();
-    if let Ok(buf_lines) = read_lines("./input/day07.txt") {
-        for line in buf_lines {
-            if let Ok(ip) = line {
-                let (cards_str, bid_str) = ip.split_once(" ").unwrap();
-                let hand = cards_str.chars().map(Card::from).collect();
-                lines.push((hand, bid_str.parse().unwrap()));
-            }
-        }
-    }
-    lines
-}
 
 fn categorise_hand(hand: &Hand) -> HandType {
     let (distinct, count) = get_distinct_and_count(hand);

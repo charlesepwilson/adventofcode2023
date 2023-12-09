@@ -1,6 +1,6 @@
+use crate::utils::{FileIter, Solves};
 use regex::Regex;
 use std::collections::HashMap;
-use crate::utils::{FileIter, Solves};
 
 const DIGITS: [(&str, u32); 9] = [
     ("1", 1u32),
@@ -29,24 +29,24 @@ const NUMBERS: [(&str, u32); 9] = [
 pub struct Solution;
 impl Solves for Solution {
     const DAY: u32 = 1;
-    type T = FileIter;
+    type ParsedInput = FileIter;
+    type Output = u32;
 
-    fn parse_input(dir: &str) -> Self::T {
+    fn parse_input(dir: &str) -> Self::ParsedInput {
         Self::read_file(dir)
     }
 
-    fn part1(dir: &str) -> u32 {
+    fn part1(dir: &str) -> Self::Output {
         let hashmap = HashMap::from(DIGITS);
         sum_calibration_digits(hashmap, Self::parse_input(dir))
     }
 
-    fn part2(dir: &str) -> u32 {
+    fn part2(dir: &str) -> Self::Output {
         let mut hashmap = HashMap::from(DIGITS);
         hashmap.extend(NUMBERS);
         sum_calibration_digits(hashmap, Self::parse_input(dir))
     }
 }
-
 
 fn sum_calibration_digits(valid_strings: HashMap<&str, u32>, lines: FileIter) -> u32 {
     let regex_parts: Vec<&str> = valid_strings.clone().into_keys().collect();
