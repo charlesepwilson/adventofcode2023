@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use std::iter::zip;
 use std::ops::{Add, Div, Mul};
 use crate::utils;
@@ -49,6 +48,7 @@ fn get_polynomial(sequence: Vec<i128>) -> Polynomial {
 }
 
 fn p_j(j: usize, sequence_len: usize) -> Polynomial {
+    // Lagrange polynomials
     let mut numerator = Polynomial::reduced(vec![1], 1);
     let jay = j as i128;
     let mut denominator = 1;
@@ -147,17 +147,5 @@ impl Mul<Polynomial> for i128 {
         coefficients = coefficients.iter().map(|x| x / gcd).collect();
 
         Polynomial::reduced(coefficients, divisor)
-    }
-}
-
-impl Display for Polynomial {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut s = Vec::new();
-        for (i, c) in self.coefficients.iter().enumerate() {
-            if *c == 0 {continue;}
-            let p = format!("{}x^{}", c, i);
-            s.push(p);
-        }
-        write!(f, "({}) / {}", s.join(" + "), self.divisor)
     }
 }
