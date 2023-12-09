@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::utils::read_lines;
+use crate::utils::{read_lines, lcm};
 
 pub fn part1() -> u32 {
     let (instructions, map) = parse_input();
@@ -118,13 +118,4 @@ fn is_end_node(node: &Node) -> bool {node[2] == 90}
 
 fn get_start_nodes(node_map: &NodeMap) -> Vec<Node> {
     node_map.keys().map(|x| *x).filter(is_start_node).collect()
-}
-
-
-fn lcm(a: u64, b: u64) -> u64 {
-    a * (b / gcd(a, b))
-}
-
-fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {a} else {gcd(b, a % b)}
 }

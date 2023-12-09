@@ -1,16 +1,20 @@
-use crate::utils::read_lines;
+use std::fmt::{Display, Formatter};
+use std::iter::zip;
+use std::ops::{Add, Div, Mul};
+use crate::utils;
 
-pub fn part1() -> i64 {
+pub fn part1() -> i128 {
     let sequences = parse_input();
-    sequences.iter().map(get_next_value).sum()
+    sequences.into_iter().map(get_next_value).sum()
 }
-pub fn part2() -> i64 {
-    0
+pub fn part2() -> i128 {
+    let sequences = parse_input();
+    sequences.into_iter().map(get_previous_value).sum()
 }
 
-fn parse_input() -> Vec<Vec<i64>> {
+fn parse_input() -> Vec<Vec<i128>> {
     let mut sequences = Vec::new();
-    if let Ok(buf_lines) = read_lines("./input/day09.txt") {
+    if let Ok(buf_lines) = utils::read_lines("./input/day09.txt") {
         for line in buf_lines {
             if let Ok(ip) = line {
                 sequences.push(
@@ -22,21 +26,138 @@ fn parse_input() -> Vec<Vec<i64>> {
     sequences
 }
 
-fn get_next_line(sequence: &Vec<i64>) -> Vec<i64> {
-    let mut next_line = Vec::new();
-    for i in 0..(sequence.len() - 1) {
-        next_line.push(sequence[i+1] - sequence[i]);
-    }
-    next_line
+fn compute_value_at_index(sequence: Vec<i128>, index: i128) -> i128 {
+    let polynomial = get_polynomial(sequence);
+    polynomial.compute_value(index)
+}
+fn get_next_value(sequence: Vec<i128>) -> i128 {
+    let len = sequence.len() as i128;
+    compute_value_at_index(sequence, len)
+}
+fn get_previous_value(sequence: Vec<i128>) -> i128 {
+    compute_value_at_index(sequence, -1)
 }
 
-fn get_next_value(sequence: &Vec<i64>) -> i64 {
-    let last = *sequence.last().unwrap();
-    let second_last = *sequence.get(sequence.len() - 2).unwrap();
-    let diff = last - second_last;
-    if diff == 0 {
-        return last;
+fn get_polynomial(sequence: Vec<i128>) -> Polynomial {
+    // y(i) = sequence[i]
+    let size = sequence.len();
+    let mut p = Polynomial::zeros(size - 1);
+    for (j, y_j) in sequence.iter().enumerate() {
+        p = p + ((*y_j) * p_j(j, size));
     }
-    return last + get_next_value(&get_next_line(sequence));
+    p
+}
 
+fn p_j(j: usize, sequence_len: usize) -> Polynomial {
+    let mut numerator = Polynomial::reduced(vec![1], 1);
+    let jay = j as i128;
+    let mut denominator = 1;
+    for k in 0..(sequence_len as i128) {
+        if k == jay { continue; }
+        denominator *= jay - k;
+        let expression = Polynomial::reduced(vec![-k, 1], 1);
+        numerator = expression * numerator;
+    }
+    numerator / (denominator)
+}
+
+struct Polynomial {
+    coefficients: Vec<i128>,
+    divisor: i128,
+}
+
+impl Polynomial {
+    fn reduced(coefficients: Vec<i128>, divisor: i128) -> Self {
+        let mut p = Self{coefficients, divisor};
+        p.reduce();
+        p
+    }
+    fn reduce(&mut self) {
+        let mut gcd = self.divisor;
+        for c in self.coefficients.iter() {
+            gcd = utils::gcd(gcd, *c);
+        }
+        self.coefficients = self.coefficients.iter().map(|x| x/gcd).collect();
+        self.divisor = self.divisor / gcd;
+    }
+    fn compute_value(&self, value: i128) -> i128 {
+        let t: i128 = self.coefficients.iter().enumerate().map(|(power, c)| c * value.pow(power as u32)).sum();
+        t / self.divisor
+    }
+
+    fn zeros(degree: usize) -> Self {
+        Self{coefficients: vec![0;degree+1], divisor: 1}
+    }
+
+    fn degree(&self) -> usize {
+        self.coefficients.len() - 1
+    }
+}
+
+impl Add for Polynomial {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let divisor = utils::lcm(self.divisor, rhs.divisor);
+        let left_mul = divisor / self.divisor;
+        let right_mul = divisor / rhs.divisor;
+        let new_left = self.coefficients.iter().map(|x| x * left_mul);
+        let new_right = rhs.coefficients.iter().map(|x| x * right_mul);
+        let coefficients = zip(new_left, new_right).map(|(l, r)| l + r).collect();
+
+        Polynomial::reduced(coefficients, divisor)
+    }
+}
+
+impl Mul for Polynomial {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut result = Self::zeros(self.degree() + rhs.degree());
+        for (s, left) in self.coefficients.iter().enumerate() {
+            for (o, right) in rhs.coefficients.iter().enumerate() {
+                let exponent = s + o;
+                let value = left * right;
+                result.coefficients[exponent] += value;
+            }
+        }
+        result.reduce();
+        result
+    }
+}
+
+impl Div<i128> for Polynomial {
+    type Output = Self;
+
+    fn div(self, rhs: i128) -> Self::Output {
+        Polynomial::reduced(self.coefficients,self.divisor * rhs)
+    }
+}
+
+impl Mul<Polynomial> for i128 {
+    type Output = Polynomial;
+
+    fn mul(self, rhs: Polynomial) -> Self::Output {
+        let mut coefficients: Vec<i128> = rhs.coefficients.iter().map( | x| x * self ).collect();
+        let mut gcd = rhs.divisor;
+        for c in coefficients.iter() {
+            gcd = utils::gcd(gcd, *c);
+        }
+        let divisor = rhs.divisor / gcd;
+        coefficients = coefficients.iter().map(|x| x / gcd).collect();
+
+        Polynomial::reduced(coefficients, divisor)
+    }
+}
+
+impl Display for Polynomial {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut s = Vec::new();
+        for (i, c) in self.coefficients.iter().enumerate() {
+            if *c == 0 {continue;}
+            let p = format!("{}x^{}", c, i);
+            s.push(p);
+        }
+        write!(f, "({}) / {}", s.join(" + "), self.divisor)
+    }
 }
