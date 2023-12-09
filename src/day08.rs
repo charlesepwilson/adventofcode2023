@@ -7,21 +7,16 @@ pub fn part1() -> u32 {
 }
 pub fn part2() -> u64 {
     let (instructions, map) = parse_input();
-    println!("{} * {} = {}", instructions.len(), map.len(), instructions.len() * map.len());
     let start_nodes = get_start_nodes(&map);
-    let (loop_info, indexed_map) = get_indexed_map(start_nodes, instructions, map);
-    println!("{}", indexed_map.len());
-    println!("{:?}", loop_info);
+    let valid_targets_groups = get_valid_targets(start_nodes, instructions, map);
     let mut valid_target_indices = Vec::new();
-    for info in loop_info {
-        valid_target_indices.push(info.valid_targets[0].overall_index);
+    for g in valid_targets_groups {
+        valid_target_indices.push(g[0]);
     }
-    println!("{:?}", valid_target_indices);
-    println!("{}", lcm(6, 8));
     valid_target_indices.iter().map(|&x| x as u64).reduce(lcm).unwrap()
 }
 
-fn parse_input() -> (Vec<Instruction>, HashMap<Node, (Node, Node)>) {
+fn parse_input() -> (Vec<Instruction>, NodeMap) {
     let mut hm = HashMap::new();
     if let Ok(mut buf_lines) = read_lines("./input/day08.txt") {
         let l1 = buf_lines.next().unwrap().unwrap();
@@ -66,7 +61,7 @@ fn parse_map_line(line: String) -> (Node, (Node, Node))
 }
 
 
-fn follow_instructions(instructions: Vec<Instruction>, map: HashMap<Node, (Node, Node)>) -> u32
+fn follow_instructions(instructions: Vec<Instruction>, map: NodeMap) -> u32
 {
     let target = alias_str("ZZZ");
     let mut node = alias_str("AAA");
@@ -90,7 +85,7 @@ fn alias_str(s: &str) -> Node {
     a
 }
 
-fn get_indexed_map(start_nodes: Vec<Node>, instructions: Vec<Instruction>, map: NodeMap) ->(Vec<LoopInfo>, HashMap<(usize, Node), (usize, Node)>) {
+fn get_valid_targets(start_nodes: Vec<Node>, instructions: Vec<Instruction>, map: NodeMap) ->Vec<Vec<usize>> {
     // condenses a map of node -> (node, node) with an instruction list to choose the path
     // to a single map from (index, node) -> node where index is the nth instruction
     // keep track of the overall index for each starting node so that we can work out at what point each
@@ -102,30 +97,19 @@ fn get_indexed_map(start_nodes: Vec<Node>, instructions: Vec<Instruction>, map: 
         let mut valid_targets = Vec::new();
         for (overall_index, (i, instruction)) in instructions.iter().enumerate().cycle().enumerate() {
             if is_end_node(&node) {
-                valid_targets.push(ValidTargetInfo{
-                    overall_index,
-                    instruction_index: i,
-                    node,
-                });
+                valid_targets.push(overall_index);
             }
             let options = *map.get(&node).unwrap();
             let next_node = instruction.follow(options);
             if indexed_map.contains_key(&(i, node)) {
-                let (original_overall_index, _) = indexed_map.get(&(i, node)).unwrap();
-                loop_info_vec.push(LoopInfo{
-                    start_node,
-                    loop_start_node: node,
-                    loop_start_index: *original_overall_index,
-                    loop_revisit_index: overall_index,
-                    valid_targets,
-                });
+                loop_info_vec.push(valid_targets);
                 break;
             }
             indexed_map.insert((i, node), (overall_index, next_node));
             node = next_node;
         }
     }
-    (loop_info_vec, indexed_map)
+    loop_info_vec
 }
 
 fn is_start_node(node: &Node) -> bool {node[2] == 65}
@@ -134,22 +118,6 @@ fn is_end_node(node: &Node) -> bool {node[2] == 90}
 
 fn get_start_nodes(node_map: &NodeMap) -> Vec<Node> {
     node_map.keys().map(|x| *x).filter(is_start_node).collect()
-}
-
-#[derive(Clone, Debug)]
-struct ValidTargetInfo {
-    overall_index: usize,
-    instruction_index: usize,
-    node: Node,
-}
-
-#[derive(Clone, Debug)]
-struct LoopInfo {
-    start_node: Node,
-    loop_start_node: Node,
-    loop_start_index: usize,
-    loop_revisit_index: usize,
-    valid_targets: Vec<ValidTargetInfo>,
 }
 
 
