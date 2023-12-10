@@ -20,11 +20,36 @@ impl Solves for Solution {
                 loop_size = l;
             }
         }
-        loop_size/2
+        loop_size / 2
     }
 
     fn part2(dir: &str) -> Self::Output {
-        dir.chars().into_iter().count()
+        let input = Self::parse_input(dir);
+        let mut junkless: Vec<Vec<char>> = Vec::new();
+        for d in [Direction::Left, Direction::Up, Direction::Right] {
+            if let Some(j) = remove_junk(&input, d) {
+                junkless = j;
+            }
+        }
+        let mut num_enclosed: usize = 0;
+        for line in junkless {
+            let mut s: String = line.iter().collect();
+            s = s.replace("-", "");
+            s = s.replace("LJ", "");
+            s = s.replace("F7", "");
+            s = s.replace("L7", "|");
+            s = s.replace("FJ", "|");
+            let mut inside: bool = false;
+            for c in s.chars() {
+                if inside & is_enclosable(c) {
+                    num_enclosed += 1;
+                }
+                if c == '|' {
+                    inside = !inside;
+                }
+            }
+        }
+        num_enclosed
     }
 }
 
@@ -67,6 +92,9 @@ fn follow_pipe(start_direction: Direction, pipe_char: char) -> Option<Direction>
 fn is_start(c: char) -> bool {
     c == 'S'
 }
+fn is_enclosable(c: char) -> bool {
+    c == '.'
+}
 
 fn find_start(input: &Vec<Vec<char>>) -> (usize, usize) {
     for (i, row) in input.iter().enumerate() {
@@ -96,7 +124,13 @@ fn find_loop_size(
         current_row = add_signed(current_row, row_change);
         current_column = add_signed(current_column, column_change);
         steps_taken += 1;
-        let new_pipe = input[current_row][current_column];
+        let new_row_o = input.get(current_row);
+        if new_row_o == None {
+            return None;
+        }
+        let new_row = new_row_o.unwrap();
+
+        let new_pipe = new_row[current_column];
         if is_start(new_pipe) {
             return Some(steps_taken);
         }
@@ -105,5 +139,54 @@ fn find_loop_size(
         } else {
             return None;
         }
+    }
+}
+
+fn remove_junk(input: &Vec<Vec<char>>, start_direction: Direction) -> Option<Vec<Vec<char>>> {
+    let num_rows = input.len();
+    let num_columns = input[0].len();
+    let mut new_input = vec![vec!['.'; num_columns]; num_rows];
+    let (mut current_row, mut current_column) = find_start(&input);
+    let mut current_direction = start_direction;
+
+    loop {
+        let (row_change, column_change) = current_direction.index_change();
+        current_row = add_signed(current_row, row_change);
+        current_column = add_signed(current_column, column_change);
+        let row_o = input.get(current_row);
+        if row_o == None {
+            return None;
+        }
+        let row = row_o.unwrap();
+        let new_pipe = row[current_column];
+        new_input[current_row][current_column] = new_pipe;
+        if is_start(new_pipe) {
+            new_input[current_row][current_column] = generate_pipe(current_direction, start_direction);
+            return Some(new_input);
+        }
+        if let Some(next_dir) = follow_pipe(current_direction, new_pipe) {
+            current_direction = next_dir;
+        } else {
+            return None;
+        }
+    }
+}
+
+
+fn generate_pipe(from: Direction, to: Direction) -> char {
+    match (from, to) {
+        (Direction::Right, Direction::Right) => '-',
+        (Direction::Right, Direction::Down) => '7',
+        (Direction::Right, Direction::Up) => 'J',
+        (Direction::Down, Direction::Right) => 'L',
+        (Direction::Down, Direction::Down) => '|',
+        (Direction::Down, Direction::Left) => 'J',
+        (Direction::Left, Direction::Down) => 'F',
+        (Direction::Left, Direction::Left) => '-',
+        (Direction::Left, Direction::Up) => 'L',
+        (Direction::Up, Direction::Right) => 'F',
+        (Direction::Up, Direction::Left) => '7',
+        (Direction::Up, Direction::Up) => '|',
+        (_, _) => panic!(),
     }
 }
