@@ -15,12 +15,12 @@ macro_rules! solve {
         $dir:literal,
         $(
             $x:ident
-        ),+,
+        ),+$(,)?
     ) => {
         $( $x::Solution::print_solutions($dir);)+
     }
 }
 
 fn main() {
-    solve!("input", day01, day02, day03, day04, day05, day06, day07, day08, day09,);
+    solve!("input", day01, day02, day03, day04, day05, day06, day07, day08, day09);
 }

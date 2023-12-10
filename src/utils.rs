@@ -45,24 +45,14 @@ pub type FileIter = FilterMap<Lines<BufReader<File>>, fn(io::Result<String>) -> 
 
 pub fn lcm<T>(a: T, b: T) -> T
 where
-    T: Div<Output = T>,
-    T: Mul<Output = T>,
-    T: Copy,
-    T: Eq,
-    T: Default,
-    T: Rem<Output = T>,
+    T: Div<Output = T> + Mul<Output = T> + Copy + Eq + Default + Rem<Output = T>,
 {
     a * (b / gcd(a, b))
 }
 
 pub fn gcd<T>(a: T, b: T) -> T
 where
-    T: Div<Output = T>,
-    T: Mul<Output = T>,
-    T: Copy,
-    T: Eq,
-    T: Default,
-    T: Rem<Output = T>,
+    T: Div<Output = T> + Mul<Output = T> + Copy + Eq + Default + Rem<Output = T>,
 {
     if b == T::default() {
         a
