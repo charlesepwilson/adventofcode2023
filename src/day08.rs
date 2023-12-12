@@ -144,3 +144,40 @@ fn is_end_node(node: &Node) -> bool {
 fn get_start_nodes(node_map: &NodeMap) -> Vec<Node> {
     node_map.keys().map(|x| *x).filter(is_start_node).collect()
 }
+
+
+// For a given start point a0, if we find an endpoint at z0 and determine that the path has a loop size of L0,
+// then the equation for the step numbers when you hit that endpoint again is:
+// z = z0 + n*L0, where n is any integer
+//
+// If you have another start point a1, then that has the same equation for its own values:
+// z = z1 + m*L1, where m is also any integer
+//
+// To find the the step number where both of them hit an endpoint,
+// we just have to set these equal and then find the minimum n and m:
+// z0 + n*L0 = z1 + m*L1
+// n*L0 - m*L1 = (z1 - z0)
+// This is equivalent to the equation described in the Extended Euclidean Algorithm
+// with a = L0, b = L1, x = n, y = m, and c = (z1 - z0)
+// where we choose z1 > z0 for convenience
+// note that for valid solutions to exist, we must have (z1 - z0) be a multiple of gcd(L0, L1)
+// and that we may need to divide the entire equation through by gcd(L0, L1) to get the
+// exact equation described in the algorithm
+//
+// once we have found the appropriate n and m, we can then substitute back into
+// z = z0 + n*L0
+// to find the step number where they both hit an endpoint
+//
+// This then gives us a new loop, where this z is our new z0,
+// and the loop size is L0_new = lcm(L0, L1)
+// we can then repeat this process with the new loop as loop 0
+// and the loop from another start point as loop 1
+// until we have included all of our endpoints
+//
+// the only problem with this solution is that it assumes each loop has only one endpoint
+// the simple way to resolve this is to just repeat this process for each combination of endpoints
+// i.e. if we had 3 start points (a, b, c), each with 2 endpoints in their loop, we would need to solve for
+// (a0, b0, c0), (a0, b0, c1), (a0, b1, c0), ... , (a1, b1, c1)
+// and then choose the lowest valid solution found
+// idk if there's a more effective way to do this, but this wouldn't be relevant for the actual puzzle input
+// but would definitely solve it for the generic case
