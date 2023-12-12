@@ -36,9 +36,9 @@ fn parse_line(line: String) -> (String, Vec<usize>) {
     (map.to_string(), numbers)
 }
 
-fn condense_row(map: String) -> Vec<(char, usize)> {
+fn condense_row(map: Vec<char>) -> Vec<(char, usize)> {
     // Converts the row into pairs of (char, count)
-    let mut map_deque: VecDeque<_> = map.chars().collect();
+    let mut map_deque: VecDeque<_> = map.into_iter().collect();
     let mut map_chain = Vec::new();
     let mut counter: usize = 0;
     let mut previous_char = OPERATIONAL;
@@ -56,18 +56,20 @@ fn condense_row(map: String) -> Vec<(char, usize)> {
 }
 
 fn compute_arrangements(map: String, numbers: Vec<usize>) -> usize {
-    let map_chain = condense_row(map);
+    let better_map = fill_in_hashes(map, &numbers);
+    let even_better_map = fill_in_blanks(better_map, &numbers);
+    let map_chain = condense_row(even_better_map);
     0
 }
 
-fn compute_unkown_arrangements2(num_unknown: usize, first_group: usize, second_group: usize) -> usize {
+fn compute_unknown_arrangements2(num_unknown: usize, first_group: usize, second_group: usize) -> usize {
     // if you just have a group of ?s, with 2 groups of #s inside,
     // this is the number of ways of arranging them
     let n = num_unknown - first_group - second_group;
     (n * (n+1)) / 2
 }
 
-fn compute_unkown_arrangements3(
+fn compute_unknown_arrangements3(
     num_unknown: usize,
     first_group: usize,
     second_group: usize,
@@ -79,9 +81,32 @@ fn compute_unkown_arrangements3(
     (n * (n+1) * (n-1)) / 6
 }
 
+fn compute_unknown_arrangements(
+    num_unknown: usize,
+    numbers: &Vec<usize>,
+) -> usize {
+    let l = numbers.len();
+    if l == 2 {
+        compute_unknown_arrangements2(num_unknown, numbers[0], numbers[1])
+    }
+    else if l == 3 {
+        compute_unknown_arrangements3(num_unknown, numbers[0], numbers[1], numbers[2])
+    }
+    else {
+        let mut total = 0;
+        for i in 1..=(num_unknown - numbers.iter().sum::<usize>() - (l - 1)) {
+            total += compute_unknown_arrangements(
+                num_unknown - numbers[0] - i,
+                &(numbers[1..].iter().map(|x| *x).collect()),
+            );
+        }
+        total
+    }
+}
+
+
 pub fn guarantee_hashes(size: usize, numbers: &Vec<usize>) -> Vec<char> {
     let total_required_space: usize = numbers.iter().sum::<usize>() + numbers.len() - 1;
-    dbg!(total_required_space, size);
     let v: usize = size - total_required_space;
     let mut row = vec![OPERATIONAL;size];
     for (index, n) in numbers.iter().enumerate() {
@@ -96,8 +121,19 @@ pub fn guarantee_hashes(size: usize, numbers: &Vec<usize>) -> Vec<char> {
     row
 }
 
-pub fn fill_in_hashes(row: String, numbers: Vec<usize>) -> Vec<char> {
+pub fn fill_in_hashes(row: String, numbers: &Vec<usize>) -> Vec<char> {
     let total_size = row.chars().count();
     let guaranteed_hashes = guarantee_hashes(total_size, &numbers);
-    zip(row.chars(), guaranteed_hashes).map(|(r, g)| if g == DAMAGED {g} else {r}).collect()
+    let combined = zip(row.chars(), guaranteed_hashes).map(|(r, g)| if g == DAMAGED {g} else {r}).collect();
+    combined
+}
+
+fn fill_in_blanks(row: Vec<char>, numbers: &Vec<usize>) -> Vec<char> {
+    let s: String = row.iter().collect();
+    for n in numbers {
+        let pat: String = (0..*n).map(|_| DAMAGED).collect();
+        let found = s.find(pat.as_str()).unwrap();
+
+    }
+    row
 }
