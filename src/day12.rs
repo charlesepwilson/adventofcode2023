@@ -94,10 +94,10 @@ fn count_ways(row: String, numbers: Vec<usize>) -> usize {
 pub fn guarantee_hashes(size: usize, numbers: &Vec<usize>) -> Vec<char> {
     if size == 0 { return Vec::new();}
     let total_required_space: usize = numbers.iter().sum::<usize>() + numbers.len() - 1;
-    let v: usize = size - total_required_space;
+    let wiggle_room: usize = size.saturating_sub(total_required_space);
     let mut row = vec![OPERATIONAL;size];
     for (index, n) in numbers.iter().enumerate() {
-        let num_hashes = n.saturating_sub(v);
+        let num_hashes = n.saturating_sub(wiggle_room);
         let previous_nums = &numbers[0..index];
         let offset = previous_nums.iter().sum::<usize>() + previous_nums.iter().count();
         for i in (n-num_hashes)..*n {
@@ -150,11 +150,15 @@ fn n_damaged_pattern(n: usize) -> String {
     vec![DAMAGED;n].iter().collect()
 }
 
-fn generate_guaranteed_block_pattern(n: usize) -> String {
+fn pad_row(row: String) -> String {
     let mut s = OPERATIONAL.to_string();
-    s += n_damaged_pattern(n).as_str();
+    s += row.as_str();
     s.push(OPERATIONAL);
     s
+}
+
+fn generate_guaranteed_block_pattern(n: usize) -> String {
+    pad_row(n_damaged_pattern(n))
 }
 
 fn strip_operational(row: String) -> String {
@@ -193,7 +197,6 @@ fn fill_in_end_groups(row: String, numbers: &Vec<usize>) -> String {
     let substr: String = row_vec[0..threshold].iter().collect();
     if substr.contains(DAMAGED) {
         // then this MUST be the first group
-        dbg!(&row_vec, first);
         if *row_vec.get(threshold).unwrap_or(&';') == OPERATIONAL {
             for i in 0..first {row_vec[i] = DAMAGED;}
         }
@@ -273,15 +276,54 @@ fn is_valid(row: &String, numbers: &Vec<usize>) -> bool {
     zip(counts, numbers).all(|(l, r)| l == *r)
 }
 
+fn remove_dead_blanks(row: String, numbers: &Vec<usize>) -> String {
+    dbg!(&row, numbers);
+    if numbers.len() == 0 {return row;}
+    let min_num = *numbers.iter().min().unwrap();
+    let mut padded_row = pad_row(row);
+    let row_vec: Vec<_> = padded_row.chars().collect();
+    let unknown_sections = padded_row.match_indices(".?");
+    let mut sections_to_replace = Vec::new();
+    for (start, _) in unknown_sections {
+        let mut i = start;
+        let mut c = UNKNOWN;
+
+        while c == UNKNOWN {
+            i = i + 1;
+            c = row_vec[i];
+        }
+        if (c == OPERATIONAL) & ((i - start) < min_num){
+            sections_to_replace.push((start, i));
+        }
+    }
+    for (start, end) in sections_to_replace.iter().rev() {
+        padded_row.replace_range(start..=end, ".");
+    }
+    dbg!(&padded_row);
+    padded_row
+}
+
+
 fn apply_all_simplification_strategies(mut row: String, mut numbers: Vec<usize>) -> (String, Vec<usize>) {
     row = fill_in_hashes(row, &numbers).into_iter().collect();
     (row, numbers) = remove_guaranteed_blocks(row, numbers);
+    dbg!(&row, &numbers);
     row = simplify(row);
     row = fill_in_end_groups(row, &numbers);
+    dbg!(&row, &numbers);
+
     row = simplify(row);
     (row, numbers) = remove_end_groups(row, numbers);
+    dbg!(&row, &numbers);
+
     row = simplify(row);
     row = try_assume_blank(row, &numbers);
+    dbg!(&row, &numbers);
+
+    row = simplify(row);
+    row = remove_dead_blanks(row, &numbers);
+    dbg!(&row, &numbers);
+
     row = simplify(row);
     (row, numbers)
 }
@@ -299,13 +341,9 @@ fn recursively_apply_all_simplification_strategies(mut row: String, mut numbers:
 fn sum_ways(input: Vec<(String, Vec<usize>)>) -> usize {
     let mut total = 0;
     for (m, n) in input {
+        dbg!(&m, &n);
         let (row, numbers) = recursively_apply_all_simplification_strategies(m, n);
-        dbg!(&row, &numbers);
         total += count_ways(row, numbers);
-        dbg!(total);
-        println!();
-        println!();
-
     }
     total
 }
