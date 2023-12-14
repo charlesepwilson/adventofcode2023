@@ -91,11 +91,11 @@ fn count_arrangements(row: &str, numbers: &[usize]) -> usize {
 }
 
 fn block_fits(block_size: usize, at_index: usize, row: &str) -> bool {
-    let padded_row = ".".to_string() + row + ".";
-    let enough_space = !padded_row[(at_index+1)..(at_index+block_size+1)].contains(OPERATIONAL);
-    let left_ok = padded_row.chars().nth(at_index).unwrap() != DAMAGED;
-    let right_ok = padded_row.chars().nth(at_index+block_size+1).unwrap() != DAMAGED;
-    enough_space && left_ok && right_ok
+    if (at_index != 0) && (row[(at_index-1)..].starts_with(DAMAGED)) {return false;}
+    if let Some(sl) = row.get(..=(at_index+block_size)) {
+        if sl.ends_with(DAMAGED) { return false; }
+    }
+    !row[at_index..(at_index+block_size)].contains(OPERATIONAL)
 }
 
 fn unfold(row: String, numbers: Vec<usize>, unfold_factor: usize) -> (String, Vec<usize>) {
