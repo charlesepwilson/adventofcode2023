@@ -22,9 +22,8 @@ impl Solves for Solution {
 
     fn part2(dir: &str) -> Self::Output {
         let input = Self::parse_input(dir);
-        let unfolded = input;
-        // count_total_arrangements(unfolded)
-        0
+        let unfolded_input = input.into_iter().map(|(row, numbers)| unfold(row, numbers, 5)).collect();
+        count_total_arrangements(unfolded_input)
     }
 }
 fn parse_line(line: String) -> (String, Vec<usize>) {
@@ -37,7 +36,6 @@ fn count_total_arrangements(input: Vec<(String, Vec<usize>)>) -> usize {
     let mut total = 0;
     for (row, numbers) in input {
         let ways = count_arrangements(&row[0..], &numbers[0..]);
-        dbg!(ways);
         total += ways;
     }
     total
@@ -66,7 +64,6 @@ fn count_arrangements(row: &str, numbers: &[usize]) -> usize {
         if n > row.len() {return 0;}
         if n == row.len() {return 1;}
         let (mindex, maxdex) = find_min_max_indices(n, row);
-        // dbg!(row, n, mindex, maxdex);
         for i in mindex..=maxdex {
             if !row[i..i+n].contains(OPERATIONAL) {
                 total += 1;
@@ -92,4 +89,14 @@ fn block_fits(block_size: usize, at_index: usize, row: &str) -> bool {
     let left_ok = padded_row.chars().nth(at_index).unwrap() != DAMAGED;
     let right_ok = padded_row.chars().nth(at_index+block_size+1).unwrap() != DAMAGED;
     enough_space && left_ok && right_ok
+}
+
+fn unfold(row: String, numbers: Vec<usize>, unfold_factor: usize) -> (String, Vec<usize>) {
+    let unfolded_row = vec![row;unfold_factor].join(UNKNOWN.to_string().as_str());
+    let mut unfolded_numbers = Vec::new();
+    for _ in 0..unfold_factor {
+        let mut n = numbers.clone();
+        unfolded_numbers.append(&mut n);
+    }
+    (unfolded_row, unfolded_numbers)
 }
