@@ -1,5 +1,4 @@
 use std::cmp::min;
-use std::iter::zip;
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -35,8 +34,12 @@ fn parse_line(line: String) -> (String, Vec<usize>) {
 
 fn count_total_arrangements(input: Vec<(String, Vec<usize>)>) -> usize {
     let mut total = 0;
+    let steps = input.len();
+    let mut i = 1;
     for (row, numbers) in input {
         let ways = count_arrangements(&row[0..], &numbers[0..]);
+        println!("done step {}/{}", i, steps);
+        i += 1;
         total += ways;
     }
     total
@@ -60,7 +63,9 @@ fn find_min_max_indices(block_size: usize, row: &str) -> (usize, usize) {
 fn count_arrangements(row: &str, numbers: &[usize]) -> usize {
     let n = numbers[0];
     let mut total = 0;
-
+    if row.chars().filter(|x| *x != OPERATIONAL).count() < numbers.iter().sum() {
+        return 0;
+    }
     if numbers.len() == 1 {
         if n > row.len() {return 0;}
         if n == row.len() {return 1;}
@@ -76,7 +81,8 @@ fn count_arrangements(row: &str, numbers: &[usize]) -> usize {
     let wiggle_room = row.len() + 1 - numbers.iter().sum::<usize>() - numbers.len();
     let max = min(row.find(DAMAGED).unwrap_or(wiggle_room), wiggle_room);
     for i in 0..=max {
-        if block_fits(n, i, row) {
+        let fits = block_fits(n, i, row);
+        if fits {
             let ways = count_arrangements(&row[(i + n + 1)..], &numbers[1..]);
             total += ways;
         }
@@ -115,10 +121,12 @@ fn brute_force_line(row: String, numbers: Vec<usize>) -> usize {
         let indices = row.match_indices("?");
         let mut attempt: Vec<_> = row.chars().collect();
         for (index, _) in indices {
-            let c = if (i&1) == 0 {}
+            let c = if (i&1) == 0 {'.'} else {'#'};
+            attempt[index] = c;
+            i = i>>1;
         }
 
-        if is_valid(attempt, &numbers) {
+        if is_valid(attempt.into_iter().collect(), &numbers) {
             total += 1;
         }
     }
