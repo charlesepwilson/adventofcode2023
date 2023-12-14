@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::iter::zip;
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -99,4 +100,28 @@ fn unfold(row: String, numbers: Vec<usize>, unfold_factor: usize) -> (String, Ve
         unfolded_numbers.append(&mut n);
     }
     (unfolded_row, unfolded_numbers)
+}
+
+fn is_valid(row: String, numbers: &Vec<usize>) -> bool {
+    let white = row.replace(".", " ");
+    let sections: Vec<usize> = white.split_whitespace().map(|x| x.len()).collect();
+    sections == *numbers
+}
+
+fn brute_force_line(row: String, numbers: Vec<usize>) -> usize {
+    let mut total = 0;
+    let num_unk = row.chars().filter(|x| *x == '?').count();
+    for mut i in 0..2usize.pow(num_unk as u32) {
+        let indices = row.match_indices("?");
+        let mut attempt: Vec<_> = row.chars().collect();
+        for (index, _) in indices {
+            let c = if (i&1) == 0 {}
+        }
+
+        if is_valid(attempt, &numbers) {
+            total += 1;
+        }
+    }
+    total
+
 }
