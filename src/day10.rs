@@ -161,7 +161,8 @@ fn remove_junk(input: &Vec<Vec<char>>, start_direction: Direction) -> Option<Vec
         let new_pipe = row[current_column];
         new_input[current_row][current_column] = new_pipe;
         if is_start(new_pipe) {
-            new_input[current_row][current_column] = generate_pipe(current_direction, start_direction);
+            new_input[current_row][current_column] =
+                generate_pipe(current_direction, start_direction);
             return Some(new_input);
         }
         if let Some(next_dir) = follow_pipe(current_direction, new_pipe) {
@@ -171,7 +172,6 @@ fn remove_junk(input: &Vec<Vec<char>>, start_direction: Direction) -> Option<Vec
         }
     }
 }
-
 
 fn generate_pipe(from: Direction, to: Direction) -> char {
     match (from, to) {
