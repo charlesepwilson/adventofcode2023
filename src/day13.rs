@@ -75,3 +75,25 @@ fn find_vertical_reflection_line(block: &Vec<Vec<u8>>) -> Option<usize> {
     let t = transpose(block);
     find_horizontal_reflection_line(&t)
 }
+
+
+// ideas for p2
+// each block only has a certain sub-block of it that is relevant to reflection,
+// where one or more rows or columns (but not both) have been removed from exactly one side of the block
+// A valid reflection block MUST have an even number of #s and .s
+// Swapping a . to a # or vice versa changes the parity of both
+// So we need to find a sub-block that has an odd number of both #s and .s
+// We also know that a sub block has an even number of rows or columns (along the reflected axis),
+// so when checking for sub-blocks we can remove 2 rows at a time
+//
+// Once a potential sub block is found, is there a better way than just iterating
+// through each potential reflect line and returning false if there's more than 1 difference?
+
+const HASH: u8 = b'#';
+const DOT: u8 = b'.';
+
+fn is_valid_subblock(subblock: &[Vec<u8>]) -> bool {
+    let num_hashes: usize = subblock.iter().map(|row| row.iter().filter(|&y| *y == HASH).count()).sum();
+    let num_dots: usize = subblock.iter().map(|row| row.iter().filter(|&y| *y == DOT).count()).sum();
+    ((num_hashes % 2) == 0) && ((num_dots % 2) == 0)
+}
