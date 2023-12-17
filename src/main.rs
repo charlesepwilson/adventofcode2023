@@ -15,7 +15,6 @@ mod day13;
 mod day14;
 mod day15;
 
-
 macro_rules! solve {
     (
         $dir:literal,
@@ -28,8 +27,8 @@ macro_rules! solve {
 }
 
 fn main() {
-    solve!("input", day15);
-    // solve!(
-    //     "input", day01, day02, day03, day04, day05, day06, day07, day08, day09, day10, day11, day13
-    // );
+    solve!(
+        "input", day01, day02, day03, day04, day05, day06, day07, day08, day09, day10, day11,
+        day13, day14, day15
+    );
 }
