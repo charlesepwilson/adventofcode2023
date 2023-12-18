@@ -18,7 +18,9 @@ pub trait Solves {
         format!("./{}/day{:02}.txt", dir, Self::DAY)
     }
     fn read_file(dir: &str) -> FileIter {
-        let Ok(lines) = Self::read_lines(Self::get_file_path(dir)) else { todo!() };
+        let Ok(lines) = Self::read_lines(Self::get_file_path(dir)) else {
+            todo!()
+        };
         lines.filter_map(|s| s.ok())
     }
     type ParsedInput;
