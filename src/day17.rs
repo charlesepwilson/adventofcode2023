@@ -17,7 +17,7 @@ impl Solves for Solution {
         let input = Self::parse_input(dir);
         let num_rows = input.len();
         let num_cols = input[0].len();
-        find_optimal_path((num_rows - 1, num_cols - 1), (0, 0), input)
+        find_optimal_path((0, 0), (num_rows - 1, num_cols - 1), input)
     }
 
     fn part2(dir: &str) -> Self::Output {
@@ -35,11 +35,18 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
 
     loop {
         for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
+            let path_len = record_grid[row][col].path.len();
+            const MAX_REPEATS: usize = 3;
+            if (path_len >= MAX_REPEATS) && (record_grid[row][col].path[(path_len - MAX_REPEATS)..].iter().all(|&x| x == d)) { continue; }
+
+
             let (col_change, row_change) = d.coordinate_change();
             if let (Some(new_row), Some(new_col)) = (row.checked_add_signed(row_change), col.checked_add_signed(col_change)) {
                 if (new_row < num_rows) && (new_col < num_cols) {
                     if !record_grid[new_row][new_col].visited {
                         record_grid[new_row][new_col].distance = record_grid[row][col].distance + grid[new_row][new_col];
+                        record_grid[new_row][new_col].path = record_grid[row][col].path.clone();
+                        record_grid[new_row][new_col].path.push(d);
                     }
                 }
             }
@@ -62,48 +69,16 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
         (row, col) = min_coords;
     }
     dbg!(&record_grid);
-
-    let mut total = 0;
-    let mut last_direction = Direction::Down;
-    let mut num_repeated_dirs = 0;
-    let (mut r, mut c) = dest;
-    while (r, c) != start {
-        let node = grid[r][c];
-        let mut min_v = u32::MAX;
-        let mut min_dir = Direction::Down;
-        total += node;
-        for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
-            if (d == last_direction) && (num_repeated_dirs >= 2) {continue;}
-            if d == last_direction.opposite() {continue;}
-            let (col_change, row_change) = d.coordinate_change();
-            if let (Some(new_row), Some(new_col)) = (r.checked_add_signed(row_change), c.checked_add_signed(col_change)) {
-                if (new_row < num_rows) && (new_col < num_cols) {
-                    let value = record_grid[new_row][new_col].distance;
-                    if value < min_v {
-                        min_v = value;
-                        min_dir = d;
-                    }
-                }
-            }
-        }
-        if min_dir == last_direction {
-            num_repeated_dirs += 1;
-        }
-        else {
-            num_repeated_dirs = 0;
-            last_direction = min_dir;
-        }
-        let (col_change, row_change) = min_dir.coordinate_change();
-        r = r.checked_add_signed(row_change).unwrap();
-        c = c.checked_add_signed(col_change).unwrap();
-    }
-    total
+    record_grid[dest.0][dest.1].distance
 }
+
+// might need to rethink this
 
 #[derive(Clone, Debug)]
 struct TraversalRecord {
     visited: bool,
     distance: u32,
+    path: Vec<Direction>,
 }
 
 impl Default for TraversalRecord {
@@ -111,6 +86,7 @@ impl Default for TraversalRecord {
         Self {
             visited: false,
             distance: u32::MAX,
+            path: Vec::new(),
         }
     }
 }
