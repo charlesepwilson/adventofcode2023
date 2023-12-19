@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -31,67 +32,97 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
     let num_cols = grid[0].len();
     let mut record_grid = vec![vec![TraversalRecord::default(); num_cols]; num_rows];
     let (mut row, mut col) = start;
-    record_grid[row][col].distance = 0;
-
+    let initial_path = Path{distance: 0, path: vec![], extended: false};
+    record_grid[row][col].paths = HashMap::from([(initial_path.num_repeats(), initial_path)]);
     loop {
-        for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
-            let path_len = record_grid[row][col].path.len();
-            const MAX_REPEATS: usize = 3;
-            if (path_len >= MAX_REPEATS) && (record_grid[row][col].path[(path_len - MAX_REPEATS)..].iter().all(|&x| x == d)) { continue; }
+        let paths = record_grid[row][col].paths.clone();
+        for ((last_direction, repeats), p) in paths {
+            for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
+                const MAX_REPEATS: u32 = 3;
+                if (repeats >= MAX_REPEATS) && (last_direction == d) { continue; }
+                if d == last_direction.opposite() {continue;}
 
 
-            let (col_change, row_change) = d.coordinate_change();
-            if let (Some(new_row), Some(new_col)) = (row.checked_add_signed(row_change), col.checked_add_signed(col_change)) {
-                if (new_row < num_rows) && (new_col < num_cols) {
-                    if !record_grid[new_row][new_col].visited {
-                        record_grid[new_row][new_col].distance = record_grid[row][col].distance + grid[new_row][new_col];
-                        record_grid[new_row][new_col].path = record_grid[row][col].path.clone();
-                        record_grid[new_row][new_col].path.push(d);
+                let (col_change, row_change) = d.coordinate_change();
+                if let (Some(new_row), Some(new_col)) = (row.checked_add_signed(row_change), col.checked_add_signed(col_change)) {
+                    if (new_row < num_rows) && (new_col < num_cols) {
+                        let mut new_path = p.path.clone();
+                        new_path.push(d);
+                        let new_distance = p.distance + grid[new_row][new_col];
+                        let new_p = Path{distance: new_distance, path: new_path, extended: false};
+                        let key = new_p.num_repeats();
+                        let existing_p = record_grid[new_row][new_col].paths.get(&key);
+                        if existing_p.is_none() || (existing_p.unwrap().distance > new_distance) {
+                            record_grid[new_row][new_col].paths.insert(key, new_p);
+                        }
+
                     }
                 }
             }
         }
-        record_grid[row][col].visited = true;
-        if record_grid.iter().all(|x| x.iter().all(|y| y.visited)) { break; }
+        for p in record_grid[row][col].paths.values_mut() {p.extended = true;}
+
         let mut min_tentative_dist = u32::MAX;
-        let mut min_coords = (0, 0);
+        let mut next_coords = (0, 0);
         for (i, row) in record_grid.iter().enumerate() {
             for (j, item) in row.iter().enumerate() {
-                if !item.visited {
-                    if item.distance < min_tentative_dist {
-                        min_tentative_dist = item.distance;
-                        min_coords = (i, j);
+                for p in item.paths.values() {
+                    if !p.extended {
+                        if p.distance < min_tentative_dist {
+                            min_tentative_dist = p.distance;
+                            next_coords = (i, j);
+                        }
                     }
                 }
-
             }
         }
-        (row, col) = min_coords;
-    }
-    dbg!(&record_grid);
-    record_grid[dest.0][dest.1].distance
-}
+        (row, col) = next_coords;
+        if !record_grid.iter().any(|row| row.iter().any(|item| item.paths.values().any(|x| !x.extended))) {
+            break;
+        }
 
-// might need to rethink this
+    }
+    let best_path = record_grid[dest.0][dest.1].paths.values().min_by_key(|&x| x.distance).unwrap();
+    dbg!(best_path);
+    best_path.distance
+}
 
 #[derive(Clone, Debug)]
 struct TraversalRecord {
-    visited: bool,
+    paths: HashMap<(Direction, u32), Path>,
+}
+
+#[derive(Clone, Debug)]
+struct Path {
     distance: u32,
     path: Vec<Direction>,
+    extended: bool,
+}
+
+impl Path {
+    fn num_repeats(&self) -> (Direction, u32) {
+        if let Some(last) = self.path.last() {
+            let mut repeats = 0;
+            for d in self.path.iter().rev() {
+                if d == last {repeats += 1;}
+                else { break; }
+            }
+            return (*last, repeats);
+        }
+        (Direction::Up, 0)
+    }
+
 }
 
 impl Default for TraversalRecord {
     fn default() -> Self {
         Self {
-            visited: false,
-            distance: u32::MAX,
-            path: Vec::new(),
+            paths: HashMap::new(),
         }
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum Direction {
     Up,
     Down,
