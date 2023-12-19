@@ -17,7 +17,7 @@ impl Solves for Solution {
         let input = Self::parse_input(dir);
         let num_rows = input.len();
         let num_cols = input[0].len();
-        find_optimal_path((0, 0), (num_rows - 1, num_cols - 1), input)
+        find_optimal_path((num_rows - 1, num_cols - 1), (0, 0), input)
     }
 
     fn part2(dir: &str) -> Self::Output {
@@ -37,7 +37,7 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
         for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
             let (col_change, row_change) = d.coordinate_change();
             if let (Some(new_row), Some(new_col)) = (row.checked_add_signed(row_change), col.checked_add_signed(col_change)) {
-                if (new_row < num_rows) && new_col < num_cols {
+                if (new_row < num_rows) && (new_col < num_cols) {
                     if !record_grid[new_row][new_col].visited {
                         record_grid[new_row][new_col].distance = record_grid[row][col].distance + grid[new_row][new_col];
                     }
@@ -45,7 +45,7 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
             }
         }
         record_grid[row][col].visited = true;
-        if record_grid[dest.0][dest.1].visited {break;}
+        if record_grid.iter().all(|x| x.iter().all(|y| y.visited)) { break; }
         let mut min_tentative_dist = u32::MAX;
         let mut min_coords = (0, 0);
         for (i, row) in record_grid.iter().enumerate() {
@@ -59,16 +59,44 @@ fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<
 
             }
         }
-        if min_coords == dest {
-            break;
-        }
         (row, col) = min_coords;
     }
+    dbg!(&record_grid);
 
     let mut total = 0;
-    let mut last_direction = Direction::Up;
+    let mut last_direction = Direction::Down;
     let mut num_repeated_dirs = 0;
-
+    let (mut r, mut c) = dest;
+    while (r, c) != start {
+        let node = grid[r][c];
+        let mut min_v = u32::MAX;
+        let mut min_dir = Direction::Down;
+        total += node;
+        for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
+            if (d == last_direction) && (num_repeated_dirs >= 2) {continue;}
+            if d == last_direction.opposite() {continue;}
+            let (col_change, row_change) = d.coordinate_change();
+            if let (Some(new_row), Some(new_col)) = (r.checked_add_signed(row_change), c.checked_add_signed(col_change)) {
+                if (new_row < num_rows) && (new_col < num_cols) {
+                    let value = record_grid[new_row][new_col].distance;
+                    if value < min_v {
+                        min_v = value;
+                        min_dir = d;
+                    }
+                }
+            }
+        }
+        if min_dir == last_direction {
+            num_repeated_dirs += 1;
+        }
+        else {
+            num_repeated_dirs = 0;
+            last_direction = min_dir;
+        }
+        let (col_change, row_change) = min_dir.coordinate_change();
+        r = r.checked_add_signed(row_change).unwrap();
+        c = c.checked_add_signed(col_change).unwrap();
+    }
     total
 }
 
@@ -102,6 +130,15 @@ impl Direction {
             Self::Down => (0, 1),
             Self::Left => (-1, 0),
             Self::Right => (1, 0),
+        }
+    }
+
+    fn opposite(&self) -> Self {
+        match self {
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
         }
     }
 }
