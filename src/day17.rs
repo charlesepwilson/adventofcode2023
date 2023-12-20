@@ -1,6 +1,6 @@
 use std::cmp::{min, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use crate::utils::Solves;
 
@@ -18,9 +18,8 @@ impl Solves for Solution {
     }
 
     fn part1(dir: &str) -> Self::Output {
-        // let input = Self::parse_input(dir);
-        // find_optimal_path::<Node1>(input)
-        0
+        let input = Self::parse_input(dir);
+        find_optimal_path::<Node1>(input)
     }
 
     fn part2(dir: &str) -> Self::Output {
@@ -32,7 +31,7 @@ impl Solves for Solution {
 fn find_optimal_path<N>(input: Vec<Vec<u32>>) -> u32
 where N: Node
 {
-    // for each grid location, there are actually 12 nodes (once we apply the 3-in-a-row constraint)
+    // for each grid location, there are actually 1many nodes (once we apply the n-in-a-row constraints)
     // that is, [(x, y, Up(1)), (x, y, Up(2)), ...(x, y, Right(3))
     let mut visited = HashSet::new();
     let mut distances = HashMap::new();
@@ -41,7 +40,7 @@ where N: Node
     let target_nodes = N::construct_possible_nodes(input.len()-1, input[0].len()-1, &input);
     distances.insert(start_node, 0);
     let mut current_node = start_node;
-    loop {
+    'outer: loop {
         let neighbours = current_node.find_neighbours(&input);
         let unvisited_neighbours = neighbours.difference(&visited);
         for n in unvisited_neighbours {
@@ -61,13 +60,15 @@ where N: Node
         }
         visited.insert(current_node);
         while visited.contains(&current_node) {
-            current_node = sorted_distances.pop().unwrap().0.1;
+            let maybe_new_node = sorted_distances.pop();
+            if maybe_new_node.is_none() { break 'outer;}
+            current_node = maybe_new_node.unwrap().0.1;
         }
         if visited.is_superset(&target_nodes) {
             break;
         }
     }
-    let possible_distances = target_nodes.iter().map(|x| distances.get(x).unwrap());
+    let possible_distances = target_nodes.iter().filter_map(|x| distances.get(x));
     *possible_distances.min().unwrap()
 }
 
@@ -103,7 +104,7 @@ trait Node: Default + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + 
             }
         }
         else {
-            if entry_path.steps < Self::MIN_STEPS {
+            if (entry_path.steps < Self::MIN_STEPS) && (entry_path.steps > 0) {
                 return None;
             }
             new_steps = 1;
@@ -189,7 +190,7 @@ impl Node for Node1 {
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy, Ord, PartialOrd, Default)]
+#[derive(Clone, Eq, PartialEq, Hash, Copy, Ord, PartialOrd, Default)]
 struct Node2 {
     row: usize,
     col: usize,
@@ -217,6 +218,11 @@ impl Node for Node2 {
     }
 }
 
+impl Debug for Node2 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Node({},{}; {:?} {})", self.get_row(), self.get_col(), self.entry_path.direction, self.entry_path.steps))
+    }
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 struct EntryPath {
