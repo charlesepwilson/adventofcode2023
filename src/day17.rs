@@ -1,5 +1,5 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
+use std::cmp::{min, Reverse};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -31,6 +31,7 @@ fn find_optimal_path(input: Vec<Vec<u32>>) -> u32 {
     // that is, [(x, y, Up(1)), (x, y, Up(2)), ...(x, y, Right(3))
     let mut visited = HashSet::new();
     let mut distances = HashMap::new();
+    let mut sorted_distances = BinaryHeap::new();
     let start_node = Node {row: 0, col: 0, entry_path: EntryPath {direction: Direction::Down, steps: 0}};
     let target_nodes = construct_possible_nodes(input.len()-1, input[0].len()-1);
 
@@ -43,19 +44,20 @@ fn find_optimal_path(input: Vec<Vec<u32>>) -> u32 {
             let heat_loss = n.get_heat_loss(&input);
             let new_distance = distances.get(&current_node).unwrap() + heat_loss;
             if let Some(d) = distances.get_mut(n) {
-                *d = min(*d, new_distance);
+                let min_d = min(*d, new_distance);
+                *d = min_d;
+                // this is the point at which the sorted distances can obtain visited nodes, since we can't easily remove the old distance when we add a new one
+                // might need to consider using a different structure than a binary heap :/
+                sorted_distances.push(Reverse((min_d, *n)));
             }
             else {
                 distances.insert(*n, new_distance);
+                sorted_distances.push(Reverse((new_distance, *n)));
             }
         }
         visited.insert(current_node);
-        let mut min_dist = u32::MAX;
-        for (n, d) in distances.iter() {
-            if (*d < min_dist) && !visited.contains(n) {
-                min_dist = *d;
-                current_node = *n;
-            }
+        while visited.contains(&current_node) {
+            current_node = sorted_distances.pop().unwrap().0.1;
         }
         if visited.is_superset(&target_nodes) {
             break;
@@ -75,7 +77,7 @@ fn construct_possible_nodes(row: usize, col: usize) -> HashSet<Node> {
     nodes
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy, Ord, PartialOrd)]
 struct Node {
     row: usize,
     col: usize,
@@ -130,13 +132,13 @@ impl Node {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 struct EntryPath {
     direction: Direction,
     steps: u32,  // number of repeated steps
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 enum Direction {
     Up,
     Down,
