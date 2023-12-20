@@ -161,29 +161,32 @@ impl FromStr for WorkflowOption {
 
 fn find_constraints(workflows: HashMap<String, Vec<String>>) -> Vec<Vec<Condition>> {
     let mut condition_sets = Vec::new();
-    for (mut label, mut wf) in workflows.iter().filter(|(_, w)| w.iter().any(|x| x.contains(ACCEPTED))) {
-        let mut conditions = Vec::new();
-        let g = ACCEPTED.to_string();
-        let mut goal = g.as_str();
-        loop {
-            dbg!(label, wf);
-            for option in wf.iter() {
-                let wf_option: WorkflowOption = option.parse().unwrap();
-                if wf_option.condition.is_none() { break; }
-                if wf_option.target.contains(goal) {
-                    conditions.push(wf_option.condition.unwrap());
-                    break;
+    for (og_label, og_wf) in workflows.iter().filter(|(_, w)| w.iter().any(|x| x.contains(ACCEPTED))) {
+        let endpoint_indices: Vec<usize> = og_wf.iter().enumerate().filter(|(_, op)| op.contains(ACCEPTED)).map(|(i, _)| i).collect();
+        dbg!(&endpoint_indices);
+        for i in endpoint_indices {
+            let mut conditions = Vec::new();
+            let mut goal = "";
+            let (mut label, mut wf) = (og_label, og_wf);
+            loop {
+                dbg!(label, wf);
+                for (j, option) in wf.iter().enumerate() {
+                    let wf_option: WorkflowOption = option.parse().unwrap();
+                    if wf_option.condition.is_none() { break; }
+                    if wf_option.target.contains(goal) || ((goal == "") && (i == j)) {
+                        conditions.push(wf_option.condition.unwrap());
+                        break;
+                    } else {
+                        conditions.push(wf_option.condition.unwrap().invert());
+                    }
                 }
-                else {
-                    conditions.push(wf_option.condition.unwrap().invert());
-                }
+                if label.as_str() == START { break; }
+                goal = label.as_str();
+                (label, wf) = find_workflow_to_reach_label(label, &workflows);
             }
-            if label.as_str() == START {break;}
-            goal = label.as_str();
-            (label, wf) = find_workflow_to_reach_label(label, &workflows);
+            dbg!(&conditions);
+            condition_sets.push(conditions);
         }
-        dbg!(&conditions);
-        condition_sets.push(conditions);
     }
     condition_sets
 }
@@ -216,10 +219,14 @@ fn count_valid_possibilities(conditions: Vec<Condition>) -> u64 {
             bounds.1 = min(condition.test_value, bounds.1);
         }
     }
-    dbg!(&boundaries);
     boundaries.values().map(|(lower, upper)| upper.saturating_sub(*lower)).product()
 }
 
 // 150616375868000
 // 167409079868000
 // haven't accounted for the possibility of 2 endpoints in one workflow
+
+// 263109656760000
+// 203308952760000
+//now I'm overcounting...
+
