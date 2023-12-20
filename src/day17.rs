@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -16,9 +17,7 @@ impl Solves for Solution {
 
     fn part1(dir: &str) -> Self::Output {
         let input = Self::parse_input(dir);
-        let num_rows = input.len();
-        let num_cols = input[0].len();
-        find_optimal_path((0, 0), (num_rows - 1, num_cols - 1), input)
+        find_optimal_path(input)
     }
 
     fn part2(dir: &str) -> Self::Output {
@@ -27,99 +26,114 @@ impl Solves for Solution {
     }
 }
 
-fn find_optimal_path(start: (usize, usize), dest: (usize, usize), grid: Vec<Vec<u32>>) -> u32 {
-    let num_rows = grid.len();
-    let num_cols = grid[0].len();
-    let mut record_grid = vec![vec![TraversalRecord::default(); num_cols]; num_rows];
-    let (mut row, mut col) = start;
-    let initial_path = Path{distance: 0, path: vec![], extended: false};
-    record_grid[row][col].paths = HashMap::from([(initial_path.num_repeats(), initial_path)]);
+fn find_optimal_path(input: Vec<Vec<u32>>) -> u32 {
+    // for each grid location, there are actually 12 nodes (once we apply the 3-in-a-row constraint)
+    // that is, [(x, y, Up(1)), (x, y, Up(2)), ...(x, y, Right(3))
+    let mut visited = HashSet::new();
+    let mut distances = HashMap::new();
+    let start_node = Node {row: 0, col: 0, entry_path: EntryPath {direction: Direction::Down, steps: 0}};
+    let target_nodes = construct_possible_nodes(input.len()-1, input[0].len()-1);
+
+    distances.insert(start_node, 0);
+    let mut current_node = start_node;
     loop {
-        let paths = record_grid[row][col].paths.clone();
-        for ((last_direction, repeats), p) in paths {
-            for d in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
-                const MAX_REPEATS: u32 = 3;
-                if (repeats >= MAX_REPEATS) && (last_direction == d) { continue; }
-                if d == last_direction.opposite() {continue;}
-
-
-                let (col_change, row_change) = d.coordinate_change();
-                if let (Some(new_row), Some(new_col)) = (row.checked_add_signed(row_change), col.checked_add_signed(col_change)) {
-                    if (new_row < num_rows) && (new_col < num_cols) {
-                        let mut new_path = p.path.clone();
-                        new_path.push(d);
-                        let new_distance = p.distance + grid[new_row][new_col];
-                        let new_p = Path{distance: new_distance, path: new_path, extended: false};
-                        let key = new_p.num_repeats();
-                        let existing_p = record_grid[new_row][new_col].paths.get(&key);
-                        if existing_p.is_none() || (existing_p.unwrap().distance > new_distance) {
-                            record_grid[new_row][new_col].paths.insert(key, new_p);
-                        }
-
-                    }
-                }
+        let neighbours = current_node.find_neighbours(&input);
+        let unvisited_neighbours = neighbours.difference(&visited);
+        for n in unvisited_neighbours {
+            let heat_loss = n.get_heat_loss(&input);
+            let new_distance = distances.get(&current_node).unwrap() + heat_loss;
+            if let Some(d) = distances.get_mut(n) {
+                *d = min(*d, new_distance);
+            }
+            else {
+                distances.insert(*n, new_distance);
             }
         }
-        for p in record_grid[row][col].paths.values_mut() {p.extended = true;}
-
-        let mut min_tentative_dist = u32::MAX;
-        let mut next_coords = (0, 0);
-        for (i, row) in record_grid.iter().enumerate() {
-            for (j, item) in row.iter().enumerate() {
-                for p in item.paths.values() {
-                    if !p.extended {
-                        if p.distance < min_tentative_dist {
-                            min_tentative_dist = p.distance;
-                            next_coords = (i, j);
-                        }
-                    }
-                }
+        visited.insert(current_node);
+        let mut min_dist = u32::MAX;
+        for (n, d) in distances.iter() {
+            if (*d < min_dist) && !visited.contains(n) {
+                min_dist = *d;
+                current_node = *n;
             }
         }
-        (row, col) = next_coords;
-        if !record_grid.iter().any(|row| row.iter().any(|item| item.paths.values().any(|x| !x.extended))) {
+        if visited.is_superset(&target_nodes) {
             break;
         }
-
     }
-    let best_path = record_grid[dest.0][dest.1].paths.values().min_by_key(|&x| x.distance).unwrap();
-    dbg!(best_path);
-    best_path.distance
+    let possible_distances = target_nodes.iter().map(|x| distances.get(x).unwrap());
+    *possible_distances.min().unwrap()
 }
 
-#[derive(Clone, Debug)]
-struct TraversalRecord {
-    paths: HashMap<(Direction, u32), Path>,
+fn construct_possible_nodes(row: usize, col: usize) -> HashSet<Node> {
+    let mut nodes = HashSet::new();
+    for steps in 1..=3 {
+        for direction in [Direction::Down, Direction::Right] {  // cheating a bit here by assuming bottom right
+            nodes.insert(Node {row, col, entry_path: EntryPath {direction, steps}});
+        }
+    }
+    nodes
 }
 
-#[derive(Clone, Debug)]
-struct Path {
-    distance: u32,
-    path: Vec<Direction>,
-    extended: bool,
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
+struct Node {
+    row: usize,
+    col: usize,
+    entry_path: EntryPath,
 }
 
-impl Path {
-    fn num_repeats(&self) -> (Direction, u32) {
-        if let Some(last) = self.path.last() {
-            let mut repeats = 0;
-            for d in self.path.iter().rev() {
-                if d == last {repeats += 1;}
-                else { break; }
+impl Node {
+    fn traverse_edge(&self, direction: Direction, grid: &Vec<Vec<u32>>) -> Option<Self> {
+        if direction == self.entry_path.direction.opposite() {return None;}
+        let (col_change, row_change) = direction.coordinate_change();
+        let new_row_o = self.row.checked_add_signed(row_change);
+        if new_row_o.is_none() {return None;}
+        let new_col_o = self.col.checked_add_signed(col_change);
+        if new_col_o.is_none() {return None;}
+        let (new_row, new_col) = (new_row_o.unwrap(), new_col_o.unwrap());
+        if (new_row >= grid.len()) || (new_col >= grid[0].len()) {
+            return None;
+        }
+        let new_steps;
+        if direction == self.entry_path.direction {
+            if self.entry_path.steps >= 3 {
+                return None;
             }
-            return (*last, repeats);
+            else {
+                new_steps = self.entry_path.steps + 1;
+            }
         }
-        (Direction::Up, 0)
+        else { new_steps = 1; }
+
+        let new_entry_path = EntryPath {
+            direction,
+            steps: new_steps,
+        };
+        let new_node = Self {
+            row: new_row, col: new_col, entry_path: new_entry_path,
+        };
+        Some(new_node)
     }
 
+    fn find_neighbours(&self, grid: &Vec<Vec<u32>>) -> HashSet<Node> {
+        let mut neighbours = HashSet::new();
+        for direction in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
+            if let Some(neighbour) = self.traverse_edge(direction, grid) {
+                neighbours.insert(neighbour);
+            }
+        }
+        neighbours
+    }
+
+    fn get_heat_loss(&self, grid: &Vec<Vec<u32>>) -> u32 {
+        grid[self.row][self.col]
+    }
 }
 
-impl Default for TraversalRecord {
-    fn default() -> Self {
-        Self {
-            paths: HashMap::new(),
-        }
-    }
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+struct EntryPath {
+    direction: Direction,
+    steps: u32,  // number of repeated steps
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
