@@ -29,8 +29,9 @@ macro_rules! solve {
 }
 
 fn main() {
-    // 872 too high
-    solve!("input", day17);
+    // solve!("input", day17);
+    // solve!("examples", day17);
+    solve!("ex2", day17);
     // solve!(
     //     "input", day01, day02, day03, day04, day05, day06, day07, day08, day09, day10, day11,
     //     day13, day14, day15, day16

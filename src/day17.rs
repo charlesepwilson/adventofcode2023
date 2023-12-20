@@ -1,5 +1,7 @@
 use std::cmp::{min, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::Hash;
 use crate::utils::Solves;
 
 pub struct Solution;
@@ -16,25 +18,27 @@ impl Solves for Solution {
     }
 
     fn part1(dir: &str) -> Self::Output {
-        let input = Self::parse_input(dir);
-        find_optimal_path(input)
+        // let input = Self::parse_input(dir);
+        // find_optimal_path::<Node1>(input)
+        0
     }
 
     fn part2(dir: &str) -> Self::Output {
         let input = Self::parse_input(dir);
-        0
+        find_optimal_path::<Node2>(input)
     }
 }
 
-fn find_optimal_path(input: Vec<Vec<u32>>) -> u32 {
+fn find_optimal_path<N>(input: Vec<Vec<u32>>) -> u32
+where N: Node
+{
     // for each grid location, there are actually 12 nodes (once we apply the 3-in-a-row constraint)
     // that is, [(x, y, Up(1)), (x, y, Up(2)), ...(x, y, Right(3))
     let mut visited = HashSet::new();
     let mut distances = HashMap::new();
     let mut sorted_distances = BinaryHeap::new();
-    let start_node = Node {row: 0, col: 0, entry_path: EntryPath {direction: Direction::Down, steps: 0}};
-    let target_nodes = construct_possible_nodes(input.len()-1, input[0].len()-1);
-
+    let start_node = N::default();
+    let target_nodes = N::construct_possible_nodes(input.len()-1, input[0].len()-1, &input);
     distances.insert(start_node, 0);
     let mut current_node = start_node;
     loop {
@@ -67,57 +71,55 @@ fn find_optimal_path(input: Vec<Vec<u32>>) -> u32 {
     *possible_distances.min().unwrap()
 }
 
-fn construct_possible_nodes(row: usize, col: usize) -> HashSet<Node> {
-    let mut nodes = HashSet::new();
-    for steps in 1..=3 {
-        for direction in [Direction::Down, Direction::Right] {  // cheating a bit here by assuming bottom right
-            nodes.insert(Node {row, col, entry_path: EntryPath {direction, steps}});
-        }
-    }
-    nodes
-}
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy, Ord, PartialOrd)]
-struct Node {
-    row: usize,
-    col: usize,
-    entry_path: EntryPath,
-}
 
-impl Node {
+trait Node: Default + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Debug {
+    const MIN_STEPS: u32;
+    const MAX_STEPS: u32;
+    fn get_row(&self) -> usize;
+    fn get_col(&self) -> usize;
+    fn get_entry_path(&self) -> EntryPath;
     fn traverse_edge(&self, direction: Direction, grid: &Vec<Vec<u32>>) -> Option<Self> {
-        if direction == self.entry_path.direction.opposite() {return None;}
+        let row = self.get_row();
+        let col = self.get_col();
+        let entry_path = self.get_entry_path();
+        if direction == entry_path.direction.opposite() {return None;}
         let (col_change, row_change) = direction.coordinate_change();
-        let new_row_o = self.row.checked_add_signed(row_change);
+        let new_row_o = row.checked_add_signed(row_change);
         if new_row_o.is_none() {return None;}
-        let new_col_o = self.col.checked_add_signed(col_change);
+        let new_col_o = col.checked_add_signed(col_change);
         if new_col_o.is_none() {return None;}
         let (new_row, new_col) = (new_row_o.unwrap(), new_col_o.unwrap());
         if (new_row >= grid.len()) || (new_col >= grid[0].len()) {
             return None;
         }
         let new_steps;
-        if direction == self.entry_path.direction {
-            if self.entry_path.steps >= 3 {
+        if direction == entry_path.direction {
+            if entry_path.steps >= Self::MAX_STEPS {
                 return None;
             }
             else {
-                new_steps = self.entry_path.steps + 1;
+                new_steps = entry_path.steps + 1;
             }
         }
-        else { new_steps = 1; }
+        else {
+            if entry_path.steps < Self::MIN_STEPS {
+                return None;
+            }
+            new_steps = 1;
+        }
 
         let new_entry_path = EntryPath {
             direction,
             steps: new_steps,
         };
-        let new_node = Self {
-            row: new_row, col: new_col, entry_path: new_entry_path,
-        };
+        let new_node = Self::from_values(new_row, new_col, new_entry_path);
         Some(new_node)
     }
 
-    fn find_neighbours(&self, grid: &Vec<Vec<u32>>) -> HashSet<Node> {
+    fn from_values(row: usize, col: usize, entry_path: EntryPath) -> Self;
+
+    fn find_neighbours(&self, grid: &Vec<Vec<u32>>) -> HashSet<Self> {
         let mut neighbours = HashSet::new();
         for direction in [Direction::Up, Direction::Down, Direction::Left, Direction::Right] {
             if let Some(neighbour) = self.traverse_edge(direction, grid) {
@@ -126,13 +128,97 @@ impl Node {
         }
         neighbours
     }
-
     fn get_heat_loss(&self, grid: &Vec<Vec<u32>>) -> u32 {
-        grid[self.row][self.col]
+        grid[self.get_row()][self.get_col()]
+    }
+
+    fn construct_possible_nodes(row: usize, col: usize, grid: &Vec<Vec<u32>>) -> HashSet<Self> {
+        let mut nodes = HashSet::new();
+        let rows = grid.len();
+        let cols = grid[0].len();
+
+        let max_up = rows - row - 1;
+        let max_down = row;
+        let max_right = cols;
+        let max_left = cols - col - 1;
+
+        for (direction, max_steps) in [
+            (Direction::Up, max_up),
+            (Direction::Down, max_down),
+            (Direction::Right, max_right),
+            (Direction::Left, max_left),
+        ] {
+            let actual_max = min(Self::MAX_STEPS, max_steps as u32);
+            for steps in Self::MIN_STEPS..=actual_max {
+                nodes.insert(Self::from_values(row, col, EntryPath {direction, steps}));
+            }
+        }
+        nodes
+    }
+
+
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy, Ord, PartialOrd, Default)]
+struct Node1 {
+    row: usize,
+    col: usize,
+    entry_path: EntryPath,
+}
+
+
+impl Node for Node1 {
+    const MIN_STEPS: u32 = 1;
+    const MAX_STEPS: u32 = 3;
+
+    fn get_row(&self) -> usize {
+        self.row
+    }
+
+    fn get_col(&self) -> usize {
+        self.col
+    }
+
+    fn get_entry_path(&self) -> EntryPath {
+        self.entry_path
+    }
+
+    fn from_values(row: usize, col: usize, entry_path: EntryPath) -> Self {
+        Self {row, col, entry_path}
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy, Ord, PartialOrd, Default)]
+struct Node2 {
+    row: usize,
+    col: usize,
+    entry_path: EntryPath,
+}
+
+impl Node for Node2 {
+    const MIN_STEPS: u32 = 4;
+    const MAX_STEPS: u32 = 10;
+
+    fn get_row(&self) -> usize {
+        self.row
+    }
+
+    fn get_col(&self) -> usize {
+        self.col
+    }
+
+    fn get_entry_path(&self) -> EntryPath {
+        self.entry_path
+    }
+
+    fn from_values(row: usize, col: usize, entry_path: EntryPath) -> Self {
+        Self {row, col, entry_path}
+    }
+}
+
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 struct EntryPath {
     direction: Direction,
     steps: u32,  // number of repeated steps
@@ -163,5 +249,11 @@ impl Direction {
             Self::Left => Self::Right,
             Self::Right => Self::Left,
         }
+    }
+}
+
+impl Default for Direction {
+    fn default() -> Self {
+        Self::Down
     }
 }
