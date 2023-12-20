@@ -1,7 +1,7 @@
-use std::cmp::{max, min};
-use std::collections::HashMap;
-use std::str::FromStr;
 use crate::utils::Solves;
+use std::cmp::{max, min};
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 pub struct Solution;
 
@@ -18,7 +18,8 @@ impl Solves for Solution {
         for line in workflows_section {
             let (name, mut instructions) = line.split_once("{").unwrap();
             instructions = instructions.trim_matches('}');
-            let conditions_mapping: Vec<_> = instructions.split(',').map(|x| x.to_string()).collect();
+            let conditions_mapping: Vec<_> =
+                instructions.split(',').map(|x| x.to_string()).collect();
             workflows.insert(name.to_string(), conditions_mapping);
         }
         let data = sections.next().unwrap();
@@ -50,9 +51,11 @@ impl Solves for Solution {
 
 const START: &str = "in";
 const ACCEPTED: char = 'A';
-const REJECTED: char = 'R';
 
-fn apply_workflows(workflows: HashMap<String, Vec<String>>, data: Vec<HashMap<String, u64>>) -> Vec<HashMap<String, u64>> {
+fn apply_workflows(
+    workflows: HashMap<String, Vec<String>>,
+    data: Vec<HashMap<String, u64>>,
+) -> Vec<HashMap<String, u64>> {
     let mut accepted_data = Vec::new();
     for d in data {
         let mut next_label = START;
@@ -74,17 +77,21 @@ fn apply_workflow(workflow: &Vec<String>, data: &HashMap<String, u64>) -> String
             if let Some((label, test_value_str)) = test.split_once('>') {
                 if let Some(value) = data.get(label) {
                     let test_value: u64 = test_value_str.parse().unwrap();
-                    if *value > test_value {return target.to_string();}
+                    if *value > test_value {
+                        return target.to_string();
+                    }
                 }
-            }
-            else if let Some((label, test_value_str)) = test.split_once('<') {
+            } else if let Some((label, test_value_str)) = test.split_once('<') {
                 if let Some(value) = data.get(label) {
                     let test_value: u64 = test_value_str.parse().unwrap();
-                    if *value < test_value {return target.to_string();}
+                    if *value < test_value {
+                        return target.to_string();
+                    }
                 }
             }
+        } else {
+            return option.to_string();
         }
-        else { return option.to_string(); }
     }
     panic!()
 }
@@ -110,11 +117,10 @@ impl Condition {
     fn invert(self) -> Self {
         let comparison;
         let test_value;
-        if self.comparison == '>'{
+        if self.comparison == '>' {
             comparison = '<';
             test_value = self.test_value + 1;
-        }
-        else {
+        } else {
             comparison = '>';
             test_value = self.test_value - 1;
         }
@@ -123,7 +129,6 @@ impl Condition {
             comparison,
             test_value,
         }
-
     }
 }
 
@@ -139,7 +144,7 @@ impl FromStr for WorkflowOption {
     type Err = ParseWorkflowError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut wf = Self{
+        let mut wf = Self {
             condition: None,
             target: s.to_string(),
         };
@@ -158,50 +163,84 @@ impl FromStr for WorkflowOption {
     }
 }
 
-
 fn find_constraints(workflows: HashMap<String, Vec<String>>) -> Vec<Vec<Condition>> {
+    let mut reverse_lookup_cache = HashMap::new();
     let mut condition_sets = Vec::new();
-    for (og_label, og_wf) in workflows.iter().filter(|(_, w)| w.iter().any(|x| x.contains(ACCEPTED))) {
-        let endpoint_indices: Vec<usize> = og_wf.iter().enumerate().filter(|(_, op)| op.contains(ACCEPTED)).map(|(i, _)| i).collect();
-        dbg!(&endpoint_indices);
+    for (og_label, og_wf) in workflows
+        .iter()
+        .filter(|(_, w)| w.iter().any(|x| x.contains(ACCEPTED)))
+    {
+        let endpoint_indices: Vec<usize> = og_wf
+            .iter()
+            .enumerate()
+            .filter(|(_, op)| op.contains(ACCEPTED))
+            .map(|(i, _)| i)
+            .collect();
         for i in endpoint_indices {
             let mut conditions = Vec::new();
-            let mut goal = "";
+            const DUMMY_GOAL: &str = "---"; //  on finding initial endpoints we use the index instead of the goal
+            let mut goal = DUMMY_GOAL;
             let (mut label, mut wf) = (og_label, og_wf);
-            loop {
-                dbg!(label, wf);
+            let mut seen_labels = HashSet::new(); // Prevent infinite loops for inaccessible endpoints
+            let found_start = loop {
+                if seen_labels.contains(label) {
+                    break false; // Back where we've already been; will never get back to "in"
+                } else {
+                    seen_labels.insert(label);
+                }
                 for (j, option) in wf.iter().enumerate() {
                     let wf_option: WorkflowOption = option.parse().unwrap();
-                    if wf_option.condition.is_none() { break; }
-                    if wf_option.target.contains(goal) || ((goal == "") && (i == j)) {
+                    if wf_option.condition.is_none() {
+                        break;
+                    }
+                    if wf_option.target.contains(goal) || ((goal == DUMMY_GOAL) && (i == j)) {
                         conditions.push(wf_option.condition.unwrap());
                         break;
                     } else {
                         conditions.push(wf_option.condition.unwrap().invert());
                     }
                 }
-                if label.as_str() == START { break; }
+                if label.as_str() == START {
+                    break true;
+                }
                 goal = label.as_str();
-                (label, wf) = find_workflow_to_reach_label(label, &workflows);
+                let reverse_lookup =
+                    find_workflow_to_reach_label(label, &workflows, &mut reverse_lookup_cache);
+                if reverse_lookup.is_none() {
+                    break false;
+                }
+                (label, wf) = reverse_lookup.unwrap();
+            };
+            if found_start {
+                condition_sets.push(conditions);
             }
-            dbg!(&conditions);
-            condition_sets.push(conditions);
         }
     }
     condition_sets
 }
 
-fn find_workflow_to_reach_label<'a>(goal: &String, workflows: &'a HashMap<String, Vec<String>>) -> (&'a String, &'a Vec<String>) {
+fn find_workflow_to_reach_label<'a>(
+    goal: &String,
+    workflows: &'a HashMap<String, Vec<String>>,
+    reverse_lookup_cache: &mut HashMap<String, String>,
+) -> Option<(&'a String, &'a Vec<String>)> {
+    if let Some(label) = reverse_lookup_cache.get(goal) {
+        return workflows.get_key_value(label);
+    }
     for (label, wf) in workflows.iter() {
-        if wf.iter().any(|x| x.contains(goal)) {
-            return (label, wf);
+        if wf
+            .iter()
+            .any(|x| x.split_once(':').unwrap_or(("", x.as_str())).1 == goal)
+        {
+            reverse_lookup_cache.insert(goal.clone(), label.clone());
+            return Some((label, wf));
         }
     }
-    panic!()
+    None
 }
 
-const MIN_VALUE: u64 = 1;  // inclusive
-const MAX_VALUE: u64 = 4001;  // exclusive
+const MIN_VALUE: u64 = 1; // inclusive
+const MAX_VALUE: u64 = 4001; // exclusive
 
 fn count_valid_possibilities(conditions: Vec<Condition>) -> u64 {
     let mut boundaries = HashMap::from([
@@ -214,19 +253,15 @@ fn count_valid_possibilities(conditions: Vec<Condition>) -> u64 {
         let bounds = boundaries.get_mut(&condition.field).unwrap();
         if condition.comparison == '>' {
             bounds.0 = max(condition.test_value + 1, bounds.0);
-        }
-        else {
+        } else {
             bounds.1 = min(condition.test_value, bounds.1);
         }
     }
-    boundaries.values().map(|(lower, upper)| upper.saturating_sub(*lower)).product()
+
+    let total = boundaries
+        .values()
+        .map(|(lower, upper)| upper.saturating_sub(*lower))
+        .product();
+
+    total
 }
-
-// 150616375868000
-// 167409079868000
-// haven't accounted for the possibility of 2 endpoints in one workflow
-
-// 263109656760000
-// 203308952760000
-//now I'm overcounting...
-

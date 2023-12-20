@@ -17,7 +17,7 @@ impl Solves for Solution {
 
     fn part1(dir: &str) -> Self::Output {
         let input = Self::parse_input(dir);
-        dbg!(holiday_ascii_string_helper("HASH"));
+
         let mut total: u32 = 0;
         for step in input {
             total += holiday_ascii_string_helper(step.as_str()) as u32;
